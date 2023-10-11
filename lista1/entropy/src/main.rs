@@ -1,3 +1,4 @@
+use std::env;
 use std::fs::File;
 use std::io::Read;
 
@@ -53,10 +54,12 @@ fn count_total_prev_occurences(cond_occ: ConditionalOccurenceTable) -> TotalOccu
 }
 
 fn main() {
+    let args: Vec<String>  = env::args().collect();
     //let mut file = File::open("/home/pawles/.cargo/bin/rustc").expect("can't read the file");
     //let mut file = File::open("../files/Rabi-Ribi Original Soundtrack - 43 M.R..flac").expect("can't read the file");
     //let mut file = File::open("../files/pan-tadeusz-czyli-ostatni-zajazd-na-litwie.txt").expect("can't read the file");
-    let mut file = File::open("../files/test1.bin").expect("can't read the file");
+    //let mut file = File::open("../files/test1.bin").expect("can't read the file");
+    let mut file = File::open("../files/".to_owned() + &args[1]).expect("can't read the file");
     let cond_occurences = count_cond_occurences(&mut file);
 
     let total_occurences = count_total_occurences(cond_occurences);
@@ -97,4 +100,5 @@ fn main() {
         }
     }
     println!("conditional entropy = {}", cond_entropy);
+    println!("difference = {}", f64::abs(entropy - cond_entropy));
 }
