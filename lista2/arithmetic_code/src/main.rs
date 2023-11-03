@@ -1,11 +1,19 @@
-use std::collections::BTreeMap;
+use std::error::Error;
 use std::fs;
+use std::fs::File;
+use std::io::Read;
+
+const BUFFER_SIZE: usize = 256;
+const BYTES_RANGE: usize = 256;
+const MAX_HIGH: u128 = 0x00000001000000000000000000000000;
+const MIN_LOW: u128 = 0x00000000000000000000000000000000;
+const INTERVAL_BITS: u8 = 4 * 24;
 
 #[derive(Debug)] 
 #[derive(Clone)] 
 struct Endpoints {
-    left: f64,
-    right: f64,
+    left: u128,
+    right: u128,
 }
 
 fn float_to_binary(z: f64) -> String {
@@ -24,264 +32,320 @@ fn float_to_binary(z: f64) -> String {
     return bin;
 }
 
-fn main() {
+fn int_to_bin(n: u128) -> String {
+    let mut bin_rep = String::new();
+    let mut bin_value = 0;
+    let mut two = 2u128.pow(INTERVAL_BITS as u32 - 1);
+    for _ in 0..INTERVAL_BITS {
+        if n >= bin_value + two {
+            bin_value += two;
+            bin_rep.push('1');
+        } else {
+            bin_rep.push('0');
+        }
+        two /= 2;
+    }
+    return bin_rep
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
 
     // read command line arguments
 
     let args: Vec<String> = std::env::args().collect();
-    
+
     if args.len() < 4 {
-        eprintln!("invalid number of arguments");
+        eprintln!("invalid number of arguments; please run the programme as: /path/to/programme <file-to-compress> <output_file_after_compression> <output_file_after_decompression>");
         std::process::exit(1);
     }
 
+    /* open the file and create the necessary structures */
 
-    /* read the input file */
+    let mut file = File::open(&args[1])?;
+    let mut buf = vec![0u8; BUFFER_SIZE];
+    
+    let mut occurences: Vec<u128> = Vec::from([1u128; BYTES_RANGE]);
+    let mut cum_occurences: Vec<Endpoints>;
+    let mut total_occurences = BYTES_RANGE as u128;
 
-    //let text = "abc";
-    let text = fs::read_to_string(&args[1]).unwrap();
+    let mut interval = Endpoints{left: MIN_LOW, right: MAX_HIGH};
+    //println!("staring subinterval: [{}, {}]", interval.left, interval.right);
 
-    let mut occurences: BTreeMap<char, u64> = BTreeMap::new();
-    let mut total_occurences = 0;
+    /* read the file by chunks and apply arithmetic coding to them */
 
-    for c in text.chars() {
-
-        // increment the total number of read characters
-        total_occurences += 1;
-
-        // increment the occurences of the character that was just read
-        match occurences.get_mut(&c) {
-            Some(occ) => *occ += 1,
-            None => { occurences.insert(c, 1); }
-        }
-    }
-
-    //println!("{:?}", occurences);
-    //println!("total occ = {}", total_occurences);
-
-    /* compute the probability of each character */
-
-    let probabilities: BTreeMap<char, f64> = occurences.iter().map(|(c, occ)| (c.clone(), (*occ as f64) / (total_occurences as f64))).collect();
-    //let probabilities: BTreeMap<char, f64> = BTreeMap::from([('a', 0.7), ('b', 0.1), ('c', 0.2)]);
-
-    /* compute the interval endpoints for each character */
-
-    let mut total_probability = 0.0;
-    let intervals: BTreeMap<char, Endpoints> = probabilities.iter().map(|(c, pbb)| {
-        let prev_total_probability = total_probability;
-        total_probability += pbb;
-        return (c.clone(), Endpoints{left: prev_total_probability, right: total_probability});
-    }).collect();
-
-    //println!("character probabilities: {:?}", probabilities);
-    //println!("total pbb = {}", total_probability);
-    //println!("character intervals: {:?}", intervals);
-
-    /* perform arithmetic coding on the input sequence */
-
-    println!("--- coding ---");
-
-    //println!("starting interval: [0, 1]");
-
-    //let mut coded = String::new()i;
     let mut coded = String::new();
-
-    {
-    let mut left = 0.0;
-    let mut right = 1.0;
     let mut counter = 0;
-    for c in text.chars() {
 
-        //println!("character read: {}", c);
+    let mut bytearr: Vec<u8> = Vec::new();
 
-        // compute the new subinterval
+    //let mut i = 0;
+    //print!("encoding:");
+    loop {
 
-        let interval_len = right - left;
-        (left, right) = (left + interval_len * intervals[&c].left, left + interval_len * intervals[&c].right);
-        //println!("new interval: [{}, {}]", left, right);
+        /* compute the cumulative occurences sum for each byte */
 
-        // scale the interval
+        cum_occurences = occurences.iter().scan(0, |cum_occ, &occ| {
+            let old_cum_occ = *cum_occ;
+            *cum_occ += occ;
+            return Some(Endpoints{left: old_cum_occ, right: *cum_occ});
+        }).collect();
 
-        loop {
-            if right <= 0.5 {
-
-                // scale to the right
-
-                left = 2.0 * left;
-                right = 2.0 * right;
-                //println!("right scale: [{}, {}]", left, right);
-
-                // append 0 and {counter} 1s to the code
-
-                //println!("appending 0{} to the code", "1".repeat(counter));
-                coded.push('0');
-                coded.push_str(&"1".repeat(counter));
-
-                // reset the counter
-
-                counter = 0;
-
-            } else if left >= 0.5 {
-
-                // scale to the left
-
-                left = 2.0 * left - 1.0;
-                right = 2.0 * right - 1.0;
-                //println!("left scale: [{}, {}]", left, right);
-
-                // append 1 and {counter} 0s to the code
-
-                //println!("appending 1{} to the code", "0".repeat(counter));
-                coded.push('1');
-                coded.push_str(&"0".repeat(counter));
-
-                // reset the counter
-                
-                counter = 0;
-
-            } else if left >= 0.25 && right <= 0.75 {
-
-                // scale both ways
-
-                left = 2.0 * left - 0.5;
-                right = 2.0 * right - 0.5;
-                //println!("both scale: [{}, {}]", left, right);
-
-                // increment the repetition counter
-
-                counter += 1;
-
-            } else {
-
-                // stop scaling: quit the loop
-
-                break;
-
-            }
-        }
-    }
-    let z = left + (right - left) / 2.0;
-    coded.push_str(&float_to_binary(z));
-    println!("coded: {}", coded);
-    fs::write(&args[2], &coded).expect("can't write coded text to the file");
-    //println!("interval: [{}, {}]", left, right);
-    }
-    
-    /* decoding */
-    
-    println!("--- decoding ---");
-
-    //println!("starting interval: [0, 1]");
-
-    let mut decoded = String::new();
-    let mut exit_code = 1;
-
-    {
-    let mut possible_chars = intervals.clone();
-    let mut total_left = 0.0;
-    let mut total_right = 1.0;
-    let mut tag_left = 0.0;
-    let mut tag_right = 1.0;
-    'readloop: for bit in coded.chars() {
-
-        // reduce the tag interval
-
-        if bit == '1' {
-            tag_left = tag_left + (tag_right - tag_left) / 2.0;
-        } else if bit == '0' {
-            tag_right = tag_left + (tag_right - tag_left) / 2.0;
-        } else {
-            //eprintln!("invalid bit read");
+        /* read the next chunk of bytes */
+        
+        let bytes_read = file.read(&mut buf)?;
+        
+        if bytes_read != 0 && occurences.iter().sum::<u128>() != total_occurences {
+            eprintln!("sum = {} but total = {}", occurences.iter().sum::<u128>(), total_occurences);
+            eprintln!("invalid total number of occurences");
             std::process::exit(1);
         }
-        //println!("new interval: [{}, {}]", tag_left, tag_right);
 
-        // retain only the characters still possible
+        //println!("{:?}", buf);
 
-        possible_chars.retain(|_, range| range.left < tag_right && range.right > tag_left);
-        //println!("possible characters: {:?}", possible_chars.keys());
+        /* find subintervals for each byte in the chunk */
 
-        // check if a character can be identified
+        for i in 0..bytes_read {
+            let byte = &buf[i];
+            /*
+            if i < 100 {
+                print!(" {}", byte);
+                i += 1;
+            } else if i == 100 {
+                println!("\nfinally: {:?}", coded);
+                i += 1;
+            }
+            */
+            bytearr.push(*byte); // REMOVE
 
-        while possible_chars.len() == 1 {
-
-            // recover the identified character and append it to the result
-
-            let (c, _) = possible_chars.pop_first().unwrap();
-            decoded.push(c);
-            //println!("character identified: {}", c);
-
-            if decoded.len() == text.len() {
-                exit_code = 0;
-                break 'readloop;
+            // compute the subinterval
+            
+            let interval_len = interval.right - interval.left;
+            (interval.left, interval.right) = (interval.left + interval_len * cum_occurences[*byte as usize].left / total_occurences, interval.left + interval_len * cum_occurences[*byte as usize].right / total_occurences);
+            //println!("new subinterval: [{}, {}]", interval.left, interval.right);
+            if interval.left >= MAX_HIGH || interval.right >= MAX_HIGH {
+                eprintln!("interval exceeded the expected range");
+                std::process::exit(1);
             }
 
-            // reduce the total interval based on the decoded character
+            // perform scaling if needed
 
-            let interval_len = total_right - total_left;
-            (total_left, total_right) = (total_left + interval_len * intervals[&c].left, total_left + interval_len * intervals[&c].right);
-            //println!("total interval: [{}, {}]", total_left, total_right);
+            loop {
+                if interval.right <= MAX_HIGH / 2 {
+
+                    // scale right
+
+                    interval.left = 2 * interval.left;
+                    interval.right = 2 * interval.right;
+                    //println!("scaling right");
+                    //println!("new subinterval: [{}, {}]", interval.left, interval.right);
+                    
+                    // append 0 and {counter} 1s to the code
+
+                    coded.push('0');
+                    coded.push_str(&"1".repeat(counter));
+
+                    // reset the counter
+
+                    counter = 0;
+
+                } else if interval.left >= MAX_HIGH / 2 {
+
+                    // scale left
+
+                    interval.left = 2 * interval.left - MAX_HIGH;
+                    interval.right = 2 * interval.right - MAX_HIGH;
+                    //println!("scaling left");
+                    //println!("new subinterval: [{}, {}]", interval.left, interval.right);
+
+                    // append 1 and {counter} 0s to the code
+
+                    coded.push('1');
+                    coded.push_str(&"0".repeat(counter));
+
+                    // reset the counter
+
+                    counter = 0;
+
+                } else if interval.left >= MAX_HIGH / 4 && interval.right <= MAX_HIGH * 3 / 4 {
+                    
+                    // scale both ways
+
+                    interval.left = 2 * interval.left - MAX_HIGH / 2;
+                    interval.right = 2 * interval.right - MAX_HIGH / 2;
+                    //println!("scaling both ways");
+                    //println!("new subinterval: [{}, {}]", interval.left, interval.right);
+
+                    // increment the counter
+
+                    counter += 1;
+
+                } else {
+                    
+                    // can't scale further; quit the loop
+
+                    break;
+                }
+            }
+        }
+
+        /* update the occurences of each byte based on the chunk */
+
+        /*
+        for i in 0..bytes_read {
+            let byte = &buf[i];
+            occurences[*byte as usize] += 1;
+        }
+        total_occurences += bytes_read as u128;
+        */
+
+        if bytes_read == 0 {
+
+            // finished reading file, so exit
+
+            break;
+        }
+    }
+
+    coded.push_str(&int_to_bin(interval.left + (interval.right - interval.left) / 2));
+    //println!("coded: {}", coded);
+    //println!("byte array: {:?}", bytearr);
+    fs::write(&args[2], &coded).expect("can't write coded text to the specified file");
+    
+    /* decoding */
+
+    let text_len = bytearr.len();
+    let mut exit_code = 1;
+
+    /* create the necessary structures */
+
+    let mut occurences: Vec<u128> = Vec::from([1u128; BYTES_RANGE]);
+    let mut cum_occurences: Vec<Endpoints> = occurences.iter().scan(0, |cum_occ, &occ| {
+        let old_cum_occ = *cum_occ;
+        *cum_occ += occ;
+        return Some(Endpoints{left: old_cum_occ, right: *cum_occ});
+    }).collect();
+    let mut total_occurences = BYTES_RANGE as u128;
+
+    let mut decoded: Vec<u8> = Vec::new();
+
+    let mut interval = Endpoints{left: MIN_LOW, right: MAX_HIGH};
+    let mut tag_interval = Endpoints{left: MIN_LOW, right: MAX_HIGH};
+
+    let mut possible_bytes: Vec<(u8, Endpoints)> = cum_occurences.iter().enumerate().map(|(byte, cum_occ)| (byte as u8, Endpoints{left: interval.left + interval.right * cum_occ.left / total_occurences, right: interval.left + interval.right * cum_occ.right / total_occurences})).collect();
+    
+
+    /* read the coded file bit by bit and retrieve the coded bytes */
+
+    //let mut i = 0;
+    //print!("decoding");
+    'decodeloop: for bit in coded.chars() {
+
+        /* reduce the tag interval */
+
+        if bit == '1' {
+            tag_interval.left = tag_interval.left + (tag_interval.right - tag_interval.left) / 2;
+        } else if bit == '0' {
+            tag_interval.right = tag_interval.left + (tag_interval.right - tag_interval.left) / 2;
+        } else {
+            eprintln!("invalid bit read while decoding: {}", bit);
+            std::process::exit(1);
+        }
+        //println!("new tag interval: {:?}", tag_interval);
+
+        /* retain only the bytes whose intervals overlap with the tag interval */
+
+        possible_bytes.retain(|(_, byte_interval)| byte_interval.left < tag_interval.right && byte_interval.right > tag_interval.left);
+        //println!("{:?}", possible_bytes.iter().map(|(byte, _)| *byte).collect::<Vec<u8>>());
+
+        /* check if a byte can be identified */
+
+        while possible_bytes.len() == 1 {
+
+            // recover the identified byte and append it to the result
+
+            let (byte, _) = possible_bytes[0];
+            decoded.push(byte);
+            /*
+            if i < 100 {
+                print!(" {}", byte);
+                i += 1;
+            } else if i == 100 {
+                println!();
+                i += 1;
+            }
+            */
+
+            if decoded.len() == text_len {
+                exit_code = 0;
+                break 'decodeloop;
+            }
+
+            // restrict the (total) interval to the interval of the identified byte
+
+            let interval_len = interval.right - interval.left;
+            (interval.left, interval.right) = (interval.left + interval_len * cum_occurences[byte as usize].left / total_occurences, interval.left + interval_len * cum_occurences[byte as usize].right / total_occurences);
+            //println!("new (total) interval: {:?}", interval);
 
             // scale the interval
 
             loop {
-                if total_right <= 0.5 {
+                if interval.right <= MAX_HIGH / 2 {
 
                     // scale to the right
 
-                    total_left = 2.0 * total_left;
-                    total_right = 2.0 * total_right;
-                    tag_left = 2.0 * tag_left;
-                    tag_right = 2.0 * tag_right;
-                    //println!("right scale: [{}, {}]; [{}, {}]", total_left, total_right, tag_left, tag_right);
+                    interval.left = 2 * interval.left;
+                    interval.right = 2 * interval.right;
+                    tag_interval.left = 2 * tag_interval.left;
+                    tag_interval.right = 2 * tag_interval.right;
+                    //println!("left scale: [{}, {}]; [{}, {}]", interval.left, interval.right, tag_interval.left, tag_interval.right);
 
-                } else if total_left >= 0.5 {
-
+                } else if interval.left >= MAX_HIGH / 2 {
+                    
                     // scale to the left
 
-                    total_left = 2.0 * total_left - 1.0;
-                    total_right = 2.0 * total_right - 1.0;
-                    tag_left = 2.0 * tag_left - 1.0;
-                    tag_right = 2.0 * tag_right - 1.0;
-                    //println!("left scale: [{}, {}]; [{}, {}]", total_left, total_right, tag_left, tag_right);
+                    interval.left = 2 * interval.left - MAX_HIGH;
+                    interval.right = 2 * interval.right - MAX_HIGH;
+                    tag_interval.left = 2 * tag_interval.left - MAX_HIGH;
+                    tag_interval.right = 2 * tag_interval.right - MAX_HIGH;
+                    //println!("right scale: [{}, {}]; [{}, {}]", interval.left, interval.right, tag_interval.left, tag_interval.right);
 
-                } else if total_left >= 0.25 && total_right <= 0.75 {
-
+                } else if interval.left >= MAX_HIGH / 4 && interval.right <= MAX_HIGH * 3 / 4 {
+                    
                     // scale both ways
 
-                    total_left = 2.0 * total_left - 0.5;
-                    total_right = 2.0 * total_right - 0.5;
-                    tag_left = 2.0 * tag_left - 0.5;
-                    tag_right = 2.0 * tag_right - 0.5;
-                    //println!("both scale: [{}, {}]; [{}, {}]", total_left, total_right, tag_left, tag_right);
+                    interval.left = 2 * interval.left - MAX_HIGH / 2;
+                    interval.right = 2 * interval.right - MAX_HIGH / 2;
+                    tag_interval.left = 2 * tag_interval.left - MAX_HIGH / 2;
+                    tag_interval.right = 2 * tag_interval.right - MAX_HIGH / 2;
+                    //println!("scale both ways: [{}, {}]; [{}, {}]", interval.left, interval.right, tag_interval.left, tag_interval.right);
 
                 } else {
 
-                    // stop scaling: quit the loop
+                    // stop scaling; quit the loop
 
                     break;
-
                 }
             }
 
-            // divide the resulting total interval into subintervals
+            // divide the (total) subinterval into subsubintervals
 
-            possible_chars = intervals.clone().iter().map(|(c, p)| (c.clone(), Endpoints{left: total_left + (total_right - total_left) * p.left, right: total_left + (total_right - total_left) * p.right})).collect();
-            //println!("new character intervals: {:?}", possible_chars);
-            
-            // retain only the characters still possible
+            possible_bytes = cum_occurences.iter().enumerate().map(|(byte, cum_occ)| (byte as u8, Endpoints{left: interval.left + interval.right * cum_occ.left / total_occurences, right: interval.left + interval.right * cum_occ.right / total_occurences})).collect();
 
-            possible_chars.retain(|_, range| range.left < tag_right && range.right > tag_left);
-            //println!("possible characters: {:?}", possible_chars.keys());
+            // retain only the bytes whose intervals overlap with the tag interval
+
+            possible_bytes.retain(|(_, byte_interval)| byte_interval.left < tag_interval.right && byte_interval.right > tag_interval.left);
 
         }
     }
-    println!("decoded: {}", decoded);
-    fs::write(&args[3], &decoded).expect("can't write decoded text to the file");
-    }
-
+    //println!("decoded: {:?}", decoded);
+    
     if exit_code == 1 {
-        eprintln!("couldn't successfully decode the text");
+        eprintln!("failed to decode the text");
         std::process::exit(1);
     }
+    
+    fs::write(&args[3], String::from_utf8(decoded).unwrap()).expect("can't write decoded text to the specified file");
+    
+
+    Ok(())
 }
