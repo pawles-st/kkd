@@ -30,7 +30,7 @@ fn main() {
 
     let args: Vec<String> = std::env::args().collect();
     
-    if args.len() < 2 {
+    if args.len() < 4 {
         eprintln!("invalid number of arguments");
         std::process::exit(1);
     }
@@ -163,6 +163,7 @@ fn main() {
     let z = left + (right - left) / 2.0;
     coded.push_str(&float_to_binary(z));
     println!("coded: {}", coded);
+    fs::write(&args[2], &coded).expect("can't write coded text to the file");
     //println!("interval: [{}, {}]", left, right);
     }
     
@@ -276,6 +277,7 @@ fn main() {
         }
     }
     println!("decoded: {}", decoded);
+    fs::write(&args[3], &decoded).expect("can't write decoded text to the file");
     }
 
     if exit_code == 1 {

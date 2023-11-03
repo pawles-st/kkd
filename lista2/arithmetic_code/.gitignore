@@ -1,1 +1,6 @@
 target
+<<<<<<< HEAD
+=======
+coded.txt
+decoded.txt
+>>>>>>> 0988a12 (Add arithmetic coding input/output to file)
