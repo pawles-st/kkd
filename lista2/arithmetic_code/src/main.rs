@@ -78,8 +78,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut bytearr: Vec<u8> = Vec::new();
 
-    //let mut i = 0;
-    //print!("encoding:");
     loop {
 
         /* compute the cumulative occurences sum for each byte */
@@ -89,6 +87,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             *cum_occ += occ;
             return Some(Endpoints{left: old_cum_occ, right: *cum_occ});
         }).collect();
+
+        //println!("{:?}", cum_occurences);
 
         /* read the next chunk of bytes */
         
@@ -103,18 +103,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         //println!("{:?}", buf);
 
         /* find subintervals for each byte in the chunk */
+            if interval.left > MAX_HIGH || interval.right > MAX_HIGH {
+                eprintln!("bleh");
+                std::process::exit(1);
+            }
 
         for i in 0..bytes_read {
+
             let byte = &buf[i];
-            /*
-            if i < 100 {
-                print!(" {}", byte);
-                i += 1;
-            } else if i == 100 {
-                println!("\nfinally: {:?}", coded);
-                i += 1;
-            }
-            */
             bytearr.push(*byte); // REMOVE
 
             // compute the subinterval
@@ -122,7 +118,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let interval_len = interval.right - interval.left;
             (interval.left, interval.right) = (interval.left + interval_len * cum_occurences[*byte as usize].left / total_occurences, interval.left + interval_len * cum_occurences[*byte as usize].right / total_occurences);
             //println!("new subinterval: [{}, {}]", interval.left, interval.right);
-            if interval.left >= MAX_HIGH || interval.right >= MAX_HIGH {
+            if interval.left > MAX_HIGH || interval.right > MAX_HIGH {
                 eprintln!("interval exceeded the expected range");
                 std::process::exit(1);
             }
@@ -190,13 +186,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         /* update the occurences of each byte based on the chunk */
 
-        /*
         for i in 0..bytes_read {
             let byte = &buf[i];
             occurences[*byte as usize] += 1;
         }
         total_occurences += bytes_read as u128;
-        */
 
         if bytes_read == 0 {
 
@@ -207,7 +201,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     coded.push_str(&int_to_bin(interval.left + (interval.right - interval.left) / 2));
-    //println!("coded: {}", coded);
+    println!("coded: {}", coded);
     //println!("byte array: {:?}", bytearr);
     fs::write(&args[2], &coded).expect("can't write coded text to the specified file");
     
@@ -231,13 +225,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut interval = Endpoints{left: MIN_LOW, right: MAX_HIGH};
     let mut tag_interval = Endpoints{left: MIN_LOW, right: MAX_HIGH};
 
-    let mut possible_bytes: Vec<(u8, Endpoints)> = cum_occurences.iter().enumerate().map(|(byte, cum_occ)| (byte as u8, Endpoints{left: interval.left + interval.right * cum_occ.left / total_occurences, right: interval.left + interval.right * cum_occ.right / total_occurences})).collect();
+    let interval_len = interval.right - interval.left;
+    let mut possible_bytes: Vec<(u8, Endpoints)> = cum_occurences.iter().enumerate().map(|(byte, cum_occ)| (byte as u8, Endpoints{left: interval.left + interval_len * cum_occ.left / total_occurences, right: interval.left + interval_len * cum_occ.right / total_occurences})).collect();
     
 
     /* read the coded file bit by bit and retrieve the coded bytes */
 
-    //let mut i = 0;
-    //print!("decoding");
     'decodeloop: for bit in coded.chars() {
 
         /* reduce the tag interval */
@@ -259,21 +252,19 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         /* check if a byte can be identified */
 
+        if possible_bytes.len() == 0 {
+            eprintln!("no possible bytes to identify");
+            std::process::exit(1);
+        }
+
         while possible_bytes.len() == 1 {
 
             // recover the identified byte and append it to the result
 
             let (byte, _) = possible_bytes[0];
             decoded.push(byte);
-            /*
-            if i < 100 {
-                print!(" {}", byte);
-                i += 1;
-            } else if i == 100 {
-                println!();
-                i += 1;
-            }
-            */
+            
+            // check if the whole text has been recovered
 
             if decoded.len() == text_len {
                 exit_code = 0;
@@ -327,9 +318,30 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
 
+            // check for bytes' probability recalculation
+
+            if decoded.len() % BUFFER_SIZE == 0 {
+                for i in (decoded.len() - BUFFER_SIZE)..decoded.len() {
+                    let byte = &decoded[i];
+                    occurences[*byte as usize] += 1;
+                }
+                total_occurences += BUFFER_SIZE as u128;
+
+                cum_occurences = occurences.iter().scan(0, |cum_occ, &occ| {
+                    let old_cum_occ = *cum_occ;
+                    *cum_occ += occ;
+                    return Some(Endpoints{left: old_cum_occ, right: *cum_occ});
+                }).collect();
+
+                if occurences.iter().sum::<u128>() > total_occurences {
+                    eprintln!("invalid number of total occurences");
+                }
+            }
+
             // divide the (total) subinterval into subsubintervals
 
-            possible_bytes = cum_occurences.iter().enumerate().map(|(byte, cum_occ)| (byte as u8, Endpoints{left: interval.left + interval.right * cum_occ.left / total_occurences, right: interval.left + interval.right * cum_occ.right / total_occurences})).collect();
+            let interval_len = interval.right - interval.left;
+            possible_bytes = cum_occurences.iter().enumerate().map(|(byte, cum_occ)| (byte as u8, Endpoints{left: interval.left + interval_len * cum_occ.left / total_occurences, right: interval.left + interval_len * cum_occ.right / total_occurences})).collect();
 
             // retain only the bytes whose intervals overlap with the tag interval
 
@@ -338,13 +350,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     //println!("decoded: {:?}", decoded);
-    
+
     if exit_code == 1 {
         eprintln!("failed to decode the text");
         std::process::exit(1);
     }
-    
-    fs::write(&args[3], String::from_utf8(decoded).unwrap()).expect("can't write decoded text to the specified file");
+
+    fs::write(&args[3], decoded).expect("can't write decoded text to the specified file");
     
 
     Ok(())
