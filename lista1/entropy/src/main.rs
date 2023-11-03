@@ -59,7 +59,7 @@ fn main() {
     //let mut file = File::open("../files/Rabi-Ribi Original Soundtrack - 43 M.R..flac").expect("can't read the file");
     //let mut file = File::open("../files/pan-tadeusz-czyli-ostatni-zajazd-na-litwie.txt").expect("can't read the file");
     //let mut file = File::open("../files/test1.bin").expect("can't read the file");
-    let mut file = File::open("../files/".to_owned() + &args[1]).expect("can't read the file");
+    let mut file = File::open(&args[1]).expect("can't read the file");
     let cond_occurences = count_cond_occurences(&mut file);
 
     let total_occurences = count_total_occurences(cond_occurences);
