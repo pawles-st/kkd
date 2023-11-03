@@ -16,22 +16,6 @@ struct Endpoints {
     right: u128,
 }
 
-fn float_to_binary(z: f64) -> String {
-    let mut bin = String::new();
-    let mut bin_value = 0.0;
-    let mut two = 0.5;
-    for _ in 1..=52 {
-        if z >= bin_value + two {
-            bin_value += two;
-            bin.push('1');
-        } else {
-            bin.push('0');
-        }
-        two /= 2.0;
-    }
-    return bin;
-}
-
 fn int_to_bin(n: u128) -> String {
     let mut bin_rep = String::new();
     let mut bin_value = 0;
