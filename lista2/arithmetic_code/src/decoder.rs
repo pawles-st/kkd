@@ -1,15 +1,12 @@
-use std::collections::VecDeque;
 use std::error::Error;
 use std::fs;
 use std::fs::File;
-use std::io::Read;
 use std::io::Write;
 
 const BUFFER_SIZE: usize = 256;
 const BYTES_RANGE: usize = 256;
 const MAX_HIGH: u128 = 0x00000001000000000000000000000000;
 const MIN_LOW: u128 = 0x00000000000000000000000000000000;
-const INTERVAL_BITS: u32 = 128 - MAX_HIGH.leading_zeros() - 1;
 
 struct Endpoints {
     left: u128,

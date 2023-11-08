@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
 use std::error::Error;
-use std::fs;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
@@ -16,23 +15,23 @@ struct Endpoints {
     right: u128,
 }
 
-fn int_to_bin(n: u128) -> VecDeque<char> {
-    let mut bin_rep = VecDeque::new();
+fn int_to_bin(n: u128) -> Vec<char> {
+    let mut bin_rep = Vec::new();
     let mut bin_value = 0;
     let mut two = 2u128.pow(INTERVAL_BITS - 1);
     for _ in 0..INTERVAL_BITS {
         if n >= bin_value + two {
             bin_value += two;
-            bin_rep.push_back('1');
+            bin_rep.push('1');
         } else {
-            bin_rep.push_back('0');
+            bin_rep.push('0');
         }
         two /= 2;
     }
     return bin_rep;
 }
 
-pub fn encode(file: &mut File, out: &mut File) -> Result<u128, Box<dyn Error>> {
+pub fn encode(file: &mut File, out: &mut File) -> Result<(u128, f64, f64, f64), Box<dyn Error>> {
 
     let mut buf = vec![0u8; BUFFER_SIZE];
 
@@ -46,6 +45,7 @@ pub fn encode(file: &mut File, out: &mut File) -> Result<u128, Box<dyn Error>> {
     /* read the file by chunks and apply arithmetic coding to them */
 
     let mut coded = VecDeque::new();
+    let mut coded_len = 0;
     
     let mut counter = 0;
 
@@ -96,6 +96,7 @@ pub fn encode(file: &mut File, out: &mut File) -> Result<u128, Box<dyn Error>> {
                     for _ in 0..counter {
                         coded.push_back('1');
                     }
+                    coded_len += 1 + counter;
                     //coded.push_str(&"1".repeat(counter));
 
                     // reset the counter
@@ -117,6 +118,7 @@ pub fn encode(file: &mut File, out: &mut File) -> Result<u128, Box<dyn Error>> {
                     for _ in 0..counter {
                         coded.push_back('0');
                     }
+                    coded_len += 1 + counter;
                     //coded.push_str(&"0".repeat(counter));
 
                     // reset the counter
@@ -173,6 +175,7 @@ pub fn encode(file: &mut File, out: &mut File) -> Result<u128, Box<dyn Error>> {
     }
 
     if coded.len() % 8 != 0 {
+        coded_len += 8 - (coded.len() & 8);
         for _ in 0..8 - (coded.len() % 8) {
             coded.push_back('0');
         }
@@ -184,5 +187,8 @@ pub fn encode(file: &mut File, out: &mut File) -> Result<u128, Box<dyn Error>> {
         out.write(&[byte_value]).expect("can't write code to the specified file");
     }
 
-    return Ok(total_occurences - BYTES_RANGE as u128);
+    let text_len = total_occurences - BYTES_RANGE as u128;
+    let entropy = 1.0;
+    let compression_rate = coded_len as f64 / text_len as f64 / 8.0;
+    return Ok((text_len, entropy, compression_rate * 8.0, compression_rate));
 }
