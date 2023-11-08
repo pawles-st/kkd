@@ -33,6 +33,8 @@ pub fn decode(file: &String, out: &mut File) -> Result<(), Box<dyn Error>> {
 
     let mut code: Vec<u8> = fs::read(file)?;
 
+    // read text length from file
+
     let mut text_len_bytes = [0u8; 16];
     let mut i = 0;
     while code[i] != 0xA {
@@ -42,9 +44,9 @@ pub fn decode(file: &String, out: &mut File) -> Result<(), Box<dyn Error>> {
     let _ = code.drain(..=i);
     let text_len = u128::from_le_bytes(text_len_bytes.try_into().unwrap());
 
-    let mut exit_code = 1;
-
     /* create the necessary structures */
+
+    let mut exit_code = 1;
 
     let mut occurences: Vec<u128> = Vec::from([1u128; BYTES_RANGE]);
     let mut cum_occurences: Vec<Endpoints> = occurences.iter().scan(0, |cum_occ, &occ| {
@@ -77,8 +79,7 @@ pub fn decode(file: &String, out: &mut File) -> Result<(), Box<dyn Error>> {
             } else if bit == '0' {
                 tag_interval.right = tag_interval.left + (tag_interval.right - tag_interval.left) / 2;
             } else {
-                eprintln!("invalid bit read while decoding: {}", bit);
-                std::process::exit(1);
+                panic!("invalid bit read while decoding: {}", bit);
             }
 
             /* retain only the bytes whose intervals overlap with the tag interval */
@@ -86,11 +87,6 @@ pub fn decode(file: &String, out: &mut File) -> Result<(), Box<dyn Error>> {
             possible_bytes.retain(|(_, byte_interval)| byte_interval.left < tag_interval.right && byte_interval.right > tag_interval.left);
 
             /* check if a byte can be identified */
-
-            if possible_bytes.len() == 0 {
-                eprintln!("no possible bytes to identify");
-                std::process::exit(1);
-            }
 
             while possible_bytes.len() == 1 {
 
@@ -165,7 +161,7 @@ pub fn decode(file: &String, out: &mut File) -> Result<(), Box<dyn Error>> {
                     }).collect();
 
                     if occurences.iter().sum::<u128>() > total_occurences {
-                        eprintln!("invalid number of total occurences");
+                        panic!("invalid number of total occurences");
                     }
                 }
 
@@ -183,8 +179,7 @@ pub fn decode(file: &String, out: &mut File) -> Result<(), Box<dyn Error>> {
     }
 
     if exit_code == 1 {
-        eprintln!("failed to decode the text");
-        std::process::exit(1);
+        return Err("failed to decode the text".try_into()?);
     }
 
     out.write(&decoded).expect("can't write decoded text to the specified file");
