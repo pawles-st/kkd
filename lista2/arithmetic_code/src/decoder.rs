@@ -29,10 +29,19 @@ fn int_to_bin2(n: u8) -> Vec<char> {
     return bin_rep;
 }
 
-pub fn decode(file: &String, out: &mut File, text_len: u128) -> Result<(), Box<dyn Error>> {
+pub fn decode(file: &String, out: &mut File) -> Result<(), Box<dyn Error>> {
 
-    let code: Vec<u8> = fs::read(file)?;
-    //let text_len = total_occurences - BYTES_RANGE as u128;
+    let mut code: Vec<u8> = fs::read(file)?;
+
+    let mut text_len_bytes = [0u8; 16];
+    let mut i = 0;
+    while code[i] != 0xA {
+        text_len_bytes[i] = code[i];
+        i += 1;
+    }
+    let _ = code.drain(..=i);
+    let text_len = u128::from_le_bytes(text_len_bytes.try_into().unwrap());
+
     let mut exit_code = 1;
 
     /* create the necessary structures */
@@ -71,12 +80,10 @@ pub fn decode(file: &String, out: &mut File, text_len: u128) -> Result<(), Box<d
                 eprintln!("invalid bit read while decoding: {}", bit);
                 std::process::exit(1);
             }
-            //println!("new tag interval: {:?}", tag_interval);
 
             /* retain only the bytes whose intervals overlap with the tag interval */
 
             possible_bytes.retain(|(_, byte_interval)| byte_interval.left < tag_interval.right && byte_interval.right > tag_interval.left);
-            //println!("{:?}", possible_bytes.iter().map(|(byte, _)| *byte).collect::<Vec<u8>>());
 
             /* check if a byte can be identified */
 
@@ -103,7 +110,6 @@ pub fn decode(file: &String, out: &mut File, text_len: u128) -> Result<(), Box<d
 
                 let interval_len = interval.right - interval.left;
                 (interval.left, interval.right) = (interval.left + interval_len * cum_occurences[byte as usize].left / total_occurences, interval.left + interval_len * cum_occurences[byte as usize].right / total_occurences);
-                //println!("new (total) interval: {:?}", interval);
 
                 // scale the interval
 
@@ -116,7 +122,6 @@ pub fn decode(file: &String, out: &mut File, text_len: u128) -> Result<(), Box<d
                         interval.right = 2 * interval.right;
                         tag_interval.left = 2 * tag_interval.left;
                         tag_interval.right = 2 * tag_interval.right;
-                        //println!("left scale: [{}, {}]; [{}, {}]", interval.left, interval.right, tag_interval.left, tag_interval.right);
 
                     } else if interval.left >= MAX_HIGH / 2 {
                         
@@ -126,7 +131,6 @@ pub fn decode(file: &String, out: &mut File, text_len: u128) -> Result<(), Box<d
                         interval.right = 2 * interval.right - MAX_HIGH;
                         tag_interval.left = 2 * tag_interval.left - MAX_HIGH;
                         tag_interval.right = 2 * tag_interval.right - MAX_HIGH;
-                        //println!("right scale: [{}, {}]; [{}, {}]", interval.left, interval.right, tag_interval.left, tag_interval.right);
 
                     } else if interval.left >= MAX_HIGH / 4 && interval.right <= MAX_HIGH * 3 / 4 {
                         
@@ -136,7 +140,6 @@ pub fn decode(file: &String, out: &mut File, text_len: u128) -> Result<(), Box<d
                         interval.right = 2 * interval.right - MAX_HIGH / 2;
                         tag_interval.left = 2 * tag_interval.left - MAX_HIGH / 2;
                         tag_interval.right = 2 * tag_interval.right - MAX_HIGH / 2;
-                        //println!("scale both ways: [{}, {}]; [{}, {}]", interval.left, interval.right, tag_interval.left, tag_interval.right);
 
                     } else {
 
@@ -178,7 +181,6 @@ pub fn decode(file: &String, out: &mut File, text_len: u128) -> Result<(), Box<d
             }
         }
     }
-    //println!("decoded: {:?}", decoded);
 
     if exit_code == 1 {
         eprintln!("failed to decode the text");

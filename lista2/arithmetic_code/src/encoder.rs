@@ -33,6 +33,8 @@ fn int_to_bin(n: u128) -> Vec<char> {
 
 pub fn encode(file: &mut File, out: &mut File) -> Result<(u128, f64, f64, f64), Box<dyn Error>> {
 
+    out.write(&(file.metadata().unwrap().len() as u128).to_le_bytes())?;
+    out.write(&[0xA])?;
     let mut buf = vec![0u8; BUFFER_SIZE];
 
     let mut occurences: Vec<u128> = Vec::from([1u128; BYTES_RANGE]);
@@ -40,7 +42,6 @@ pub fn encode(file: &mut File, out: &mut File) -> Result<(u128, f64, f64, f64), 
     let mut total_occurences = BYTES_RANGE as u128;
 
     let mut interval = Endpoints{left: MIN_LOW, right: MAX_HIGH};
-    //println!("staring subinterval: [{}, {}]", interval.left, interval.right);
 
     /* read the file by chunks and apply arithmetic coding to them */
 
@@ -59,10 +60,9 @@ pub fn encode(file: &mut File, out: &mut File) -> Result<(u128, f64, f64, f64), 
             return Some(Endpoints{left: old_cum_occ, right: *cum_occ});
         }).collect();
 
-        //println!("{:?}", cum_occurences);
 
         /* read the next chunk of bytes */
-        
+
         let bytes_read = file.read(&mut buf)?;
 
         /* find subintervals for each byte in the chunk */
@@ -76,8 +76,6 @@ pub fn encode(file: &mut File, out: &mut File) -> Result<(u128, f64, f64, f64), 
             let interval_len = interval.right - interval.left;
             (interval.left, interval.right) = (interval.left + interval_len * cum_occurences[*byte as usize].left / total_occurences, interval.left + interval_len * cum_occurences[*byte as usize].right / total_occurences);
 
-            //println!("new subinterval: [{}, {}]", interval.left, interval.right);
-
             // perform scaling if needed
 
             loop {
@@ -87,8 +85,6 @@ pub fn encode(file: &mut File, out: &mut File) -> Result<(u128, f64, f64, f64), 
 
                     interval.left = 2 * interval.left;
                     interval.right = 2 * interval.right;
-                    //println!("scaling right");
-                    //println!("new subinterval: [{}, {}]", interval.left, interval.right);
 
                     // append 0 and {counter} 1s to the code
 
@@ -97,7 +93,6 @@ pub fn encode(file: &mut File, out: &mut File) -> Result<(u128, f64, f64, f64), 
                         coded.push_back('1');
                     }
                     coded_len += 1 + counter;
-                    //coded.push_str(&"1".repeat(counter));
 
                     // reset the counter
 
@@ -109,8 +104,6 @@ pub fn encode(file: &mut File, out: &mut File) -> Result<(u128, f64, f64, f64), 
 
                     interval.left = 2 * interval.left - MAX_HIGH;
                     interval.right = 2 * interval.right - MAX_HIGH;
-                    //println!("scaling left");
-                    //println!("new subinterval: [{}, {}]", interval.left, interval.right);
 
                     // append 1 and {counter} 0s to the code
 
@@ -119,7 +112,6 @@ pub fn encode(file: &mut File, out: &mut File) -> Result<(u128, f64, f64, f64), 
                         coded.push_back('0');
                     }
                     coded_len += 1 + counter;
-                    //coded.push_str(&"0".repeat(counter));
 
                     // reset the counter
 
@@ -131,8 +123,6 @@ pub fn encode(file: &mut File, out: &mut File) -> Result<(u128, f64, f64, f64), 
 
                     interval.left = 2 * interval.left - MAX_HIGH / 2;
                     interval.right = 2 * interval.right - MAX_HIGH / 2;
-                    //println!("scaling both ways");
-                    //println!("new subinterval: [{}, {}]", interval.left, interval.right);
 
                     // increment the counter
 
@@ -188,7 +178,24 @@ pub fn encode(file: &mut File, out: &mut File) -> Result<(u128, f64, f64, f64), 
     }
 
     let text_len = total_occurences - BYTES_RANGE as u128;
-    let entropy = 1.0;
+
+    // remove the "extra" occurences
+
+    for i in 0..occurences.len() {
+        occurences[i] -= 1;
+    }
+    total_occurences -= BYTES_RANGE as u128;
+
+    // compute the entropy
+
+    let mut entropy = 0.0;
+    for byte in 0..BYTES_RANGE {
+        let occurence_pbb: f64 = occurences[byte] as f64 / total_occurences as f64;
+        if occurence_pbb > 0.0 {
+            entropy += -occurence_pbb * f64::log2(occurence_pbb);
+        }
+    } 
+
     let compression_rate = coded_len as f64 / text_len as f64 / 8.0;
     return Ok((text_len, entropy, compression_rate * 8.0, compression_rate));
 }

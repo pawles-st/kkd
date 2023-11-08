@@ -10,26 +10,32 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let args: Vec<String> = std::env::args().collect();
 
-    if args.len() < 4 {
-        eprintln!("invalid number of arguments; please run the programme as: /path/to/programme <file-to-compress> <output_file_after_compression> <output_file_after_decompression>");
-        std::process::exit(1);
+    if args.len() < 2 {
+        return Err("Please specify if you want to encode or decode a file".into());
     }
 
-    /* open the file and create the necessary structures */
+    if args[1] == "encode" {
+        if args.len() < 4 {
+            return Err("Please specify the file to encode and the output file".into());
+        }
 
-    let mut source_file = File::open(&args[1])?;
-    let mut coded_file = File::create(&args[2])?;
-    let mut decoded_file = File::create(&args[3])?;
+        let mut source_file = File::open(&args[2])?;
+        let mut coded_file = File::create(&args[3])?;
+        let (text_len, entropy, code_len, compression_rate) = encoder::encode(&mut source_file, &mut coded_file)?;
+        println!("text length = {}", text_len);
+        println!("entropy = {}", entropy);
+        println!("avg code length = {}", code_len);
+        println!("compression rate = {}", compression_rate);
+    } else if args[1] == "decode" {
+        if args.len() < 4 {
+            return Err("Please specify the file to decode and the output file".into());
+        }
 
-    // encode
-    let (text_len, entropy, code_len, compression_rate) = encoder::encode(&mut source_file, &mut coded_file)?;
-    println!("text length = {}", text_len);
-    println!("entropy = {}", entropy);
-    println!("avg code length = {}", code_len);
-    println!("compression rate = {}", compression_rate);
+        let mut decoded_file = File::create(&args[3])?;
+        decoder::decode(&args[2], &mut decoded_file)?;
+    } else {
+        return Err("Please specify what you want to do".into());
+    }
 
-    // decode
-    decoder::decode(&args[2], &mut decoded_file, text_len)?;
-    
     Ok(())
 }
