@@ -1,1 +1,0 @@
-/mnt/personal/learning/pwr/kkd/lista3/dictinary_code/target/debug/dictinary_code: /mnt/personal/learning/pwr/kkd/lista3/dictinary_code/src/elias_code.rs /mnt/personal/learning/pwr/kkd/lista3/dictinary_code/src/fibonacci_code.rs /mnt/personal/learning/pwr/kkd/lista3/dictinary_code/src/lzw.rs /mnt/personal/learning/pwr/kkd/lista3/dictinary_code/src/main.rs
