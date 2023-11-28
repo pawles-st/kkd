@@ -1,8 +1,8 @@
-use std::fs::File;
-
 pub mod lzw;
 pub mod elias_code;
 pub mod fibonacci_code;
+
+type BIT = u8;
 
 pub enum CodeType {
     GAMMA,
@@ -10,74 +10,68 @@ pub enum CodeType {
     OMEGA,
 }
 
-pub fn compress_str(message: String, code: CodeType) -> Vec<char> {
-    let lzw_code = lzw::encode(message.as_bytes());
-    return match code {
-        CodeType::GAMMA => elias_code::gamma_encode_seq(&lzw_code),
-        CodeType::DELTA => elias_code::delta_encode_seq(&lzw_code),
-        CodeType::OMEGA => elias_code::omega_encode_seq(&lzw_code),
+fn pad_zeros(v: &mut Vec<BIT>) {
+    if v.len() % 8 != 0 {
+        for _ in 0..(8 - v.len() % 8) {
+            v.push(0);
+        }
     }
 }
 
-pub fn compress_bytes(message_bytes: &Vec<u8>, code: CodeType) -> Vec<u8> {
+fn pad_ones(v: &mut Vec<BIT>) {
+    if v.len() % 8 != 0 {
+        for _ in 0..(8 - v.len() % 8) {
+            v.push(1);
+        }
+    }
+}
+
+fn bits_to_bytes(bits: &[BIT]) -> Vec<u8> {
+    return bits
+        .chunks(8)
+        .fold(Vec::<u8>::new(), |mut bytes, chunk| {
+            println!("{:?}", chunk);
+            bytes.push(
+                chunk
+                .iter()
+                .fold(0, |acc, &bit| (acc << 1) + bit as u8)
+            );
+            bytes
+        });
+}
+
+pub fn compress_str(message: String, code: &CodeType) -> Vec<u8> {
+    return compress_bytes(message.as_bytes(), code);
+}
+
+pub fn compress_bytes(message_bytes: &[u8], code: &CodeType) -> Vec<u8> {
     let lzw_code = lzw::encode(message_bytes);
     return match code {
-        CodeType::GAMMA => elias_code::gamma_encode_seq(&lzw_code),
-        CodeType::DELTA => elias_code::delta_encode_seq(&lzw_code),
-        CodeType::OMEGA => elias_code::omega_encode_seq(&lzw_code),
-    }
-}
-
-pub fn decompress_bytes(coded: &mut Vec<char>, code: CodeType) -> Vec<u8> {
-    let lzw_code = match code {
-        CodeType::GAMMA => elias_code::gamma_decode_seq(coded),
-        CodeType::DELTA => elias_code::delta_decode_seq(coded),
-        CodeType::OMEGA => elias_code::omega_decode_seq(coded),
+        CodeType::GAMMA => {
+            let mut code_bits = elias_code::gamma_encode(&lzw_code);
+            pad_zeros(&mut code_bits);
+            bits_to_bytes(&code_bits)
+        },
+        CodeType::DELTA => {
+            let mut code_bits = elias_code::delta_encode(&lzw_code);
+            pad_zeros(&mut code_bits);
+            bits_to_bytes(&code_bits)
+        },
+        CodeType::OMEGA => {
+            let mut code_bits = elias_code::omega_encode(&lzw_code);
+            pad_ones(&mut code_bits);
+            bits_to_bytes(&code_bits)
+        },
     };
-    return lzw::decode(&lzw_code);
 }
 
-pub fn compress(input: &mut File, output: &mut File, code: CodeType) {
-
-    // lzw encoding
-    
-    let encoded = lzw::encode("abababa".as_bytes());
-    println!("{:?}", encoded);
-
-    // gamma
-    
-    println!("--- gamma ---");
-
-    let mut gamma = elias_code::gamma_encode_seq(&encoded);
-    println!("{:?}", gamma);
-    let goriginal = elias_code::gamma_decode_seq(&mut gamma);
-    println!("{:?}", gamma);
-    println!("{:?}", goriginal);
-
-    // delta
-    
-    println!("--- delta ---");
-
-    let mut delta = elias_code::delta_encode_seq(&encoded);
-    println!("{:?}", delta);
-    let doriginal = elias_code::delta_decode_seq(&mut delta);
-    println!("{:?}", delta);
-    println!("{:?}", doriginal);
-
-    // omega
-
-    println!("--- omega ---");
-    
-    let mut omega = elias_code::omega_encode_seq(&encoded);
-    println!("{:?}", omega);
-    let ooriginal = elias_code::omega_decode_seq(&mut omega);
-    println!("{:?}", omega);
-    println!("{:?}", ooriginal);
-
-    // lzw decoding
-    
-    println!("--- original---");
-    
-    let decoded = lzw::decode(&ooriginal);
-    println!("{:?}", decoded);
+pub fn decompress_bytes(coded: &[u8], code: &CodeType) -> Vec<u8> {
+    println!("{:?}", coded);
+    let lzw_code = match code {
+        CodeType::GAMMA => elias_code::gamma_decode(&coded),
+        CodeType::DELTA => elias_code::delta_decode(&coded),
+        CodeType::OMEGA => elias_code::omega_decode(&coded),
+    };
+    println!("{:?}", lzw_code);
+    return lzw::decode(&lzw_code);
 }
