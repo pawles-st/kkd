@@ -15,19 +15,17 @@ fn main() -> Result<(), Box<dyn Error>>{
         "gamma" => CodeType::GAMMA,
         "delta" => CodeType::DELTA,
         "omega" => CodeType::OMEGA,
+        "fib" => CodeType::FIB,
         _ => {println!("Invalid code type"); std::process::exit(1);},
     };
 
     match args[1].as_str() {
         "compress" => {
             let compressed = compress_bytes(&text, &code);
-            println!("{:?}", compressed);
-            println!("{:?}", &args[3]);
             fs::write(&args[3], compressed)?;
         },
         "decompress" => {
             let decompressed = decompress_bytes(&text, &code);
-            println!("{:?}", decompressed);
             fs::write(&args[3], decompressed)?;
         },
         _ => {println!("Invalid action"); std::process::exit(1);},

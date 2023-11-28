@@ -8,6 +8,7 @@ pub enum CodeType {
     GAMMA,
     DELTA,
     OMEGA,
+    FIB,
 }
 
 fn pad_zeros(v: &mut Vec<BIT>) {
@@ -30,7 +31,6 @@ fn bits_to_bytes(bits: &[BIT]) -> Vec<u8> {
     return bits
         .chunks(8)
         .fold(Vec::<u8>::new(), |mut bytes, chunk| {
-            println!("{:?}", chunk);
             bytes.push(
                 chunk
                 .iter()
@@ -62,16 +62,20 @@ pub fn compress_bytes(message_bytes: &[u8], code: &CodeType) -> Vec<u8> {
             pad_ones(&mut code_bits);
             bits_to_bytes(&code_bits)
         },
+        CodeType::FIB => {
+            let mut code_bits = fibonacci_code::fib_encode(&lzw_code);
+            pad_ones(&mut code_bits);
+            bits_to_bytes(&code_bits)
+        },
     };
 }
 
 pub fn decompress_bytes(coded: &[u8], code: &CodeType) -> Vec<u8> {
-    println!("{:?}", coded);
     let lzw_code = match code {
         CodeType::GAMMA => elias_code::gamma_decode(&coded),
         CodeType::DELTA => elias_code::delta_decode(&coded),
         CodeType::OMEGA => elias_code::omega_decode(&coded),
+        CodeType::FIB => fibonacci_code::fib_decode(&coded),
     };
-    println!("{:?}", lzw_code);
     return lzw::decode(&lzw_code);
 }

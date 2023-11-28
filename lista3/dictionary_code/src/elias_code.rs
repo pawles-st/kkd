@@ -29,12 +29,11 @@ fn bytes_to_bits(v: &[u8]) -> Vec<BIT> {
     let b = v
         .iter()
         .fold(Vec::new(), |mut bits, byte| {
-            bits.push((0..BYTE_SIZE)
-                .rev()
-                .fold(0, |acc, pos| ((byte >> pos) & 1)));
+            for pos in (0..BYTE_SIZE).rev() {
+                bits.push((byte >> pos) & 1);
+            }
             return bits;
         });
-    println!("{:?}", b);
     return b;
 }
 
