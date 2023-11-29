@@ -64,7 +64,7 @@ pub fn compress_bytes(message_bytes: &[u8], code: &CodeType) -> Vec<u8> {
         },
         CodeType::FIB => {
             let mut code_bits = fibonacci_code::fib_encode(&lzw_code);
-            pad_ones(&mut code_bits);
+            pad_zeros(&mut code_bits);
             bits_to_bytes(&code_bits)
         },
     };
