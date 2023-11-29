@@ -19,6 +19,7 @@ fn bytes_to_bits(v: &[u8]) -> Vec<BIT> {
 pub fn fib_encode_one(mut value: usize, fib_table: &mut Vec<usize>) -> Vec<BIT> {
     //let mut coded = vec![1];
 
+    value += 1;
     let max_fib = fib_table
         .iter()
         .position(|&fib_value| fib_value > value);
@@ -106,7 +107,7 @@ pub fn fib_decode_one<'a, 'b>(coded: &'a[BIT], fib_table: &'b mut Vec<usize>) ->
                     acc
                 }
             });
-        return Some((value, &coded[(code_end + 2)..]));
+        return Some((value - 1, &coded[(code_end + 2)..]));
     } else {
         return None;
     }
