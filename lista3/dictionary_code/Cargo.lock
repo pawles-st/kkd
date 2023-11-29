@@ -5,3 +5,10 @@ version = 3
 [[package]]
 name = "dictionary_code"
 version = "0.1.0"
+dependencies = [
+ "entropy",
+]
+
+[[package]]
+name = "entropy"
+version = "0.1.0"
