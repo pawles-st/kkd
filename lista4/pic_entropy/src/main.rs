@@ -152,14 +152,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(Ordering::Equal))
         .map(|(index, _)| index)
         .unwrap();
-    println!("best total entropy has predictor {}", predictors[min_green]);
+    println!("best green entropy has predictor {}", predictors[min_green]);
     let min_red = [code_1_red_entropy, code_2_red_entropy, code_3_red_entropy, code_4_red_entropy, code_5_red_entropy, code_6_red_entropy, code_7_red_entropy, code_new_red_entropy]
         .iter()
         .enumerate()
         .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(Ordering::Equal))
         .map(|(index, _)| index)
         .unwrap();
-    println!("best total entropy has predictor {}", predictors[min_red]);
+    println!("best red entropy has predictor {}", predictors[min_red]);
 
 
     Ok(())
