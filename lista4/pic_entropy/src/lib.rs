@@ -244,8 +244,6 @@ pub fn code_predictor_new(pixels: &PixelArray) -> PixelArray {
 
 pub fn read_data(file: &str) -> Result<PixelArray, Box<dyn Error>> {
 
-    /* assume no colour map for now */
-
     let bytes = fs::read(file)?;
     let header = &bytes[..18];
     let image = &bytes[18..];
@@ -256,7 +254,6 @@ pub fn read_data(file: &str) -> Result<PixelArray, Box<dyn Error>> {
     let height_spec = [bytes[14], bytes[15]];
     let width = u16::from_le_bytes(width_spec) as usize;
     let height = u16::from_le_bytes(height_spec) as usize;
-    //let total_size = width * height;
     //println!("w = {:?}", width);
     //println!("h = {:?}", height);
 

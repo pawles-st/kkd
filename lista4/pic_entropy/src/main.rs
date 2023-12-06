@@ -22,6 +22,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         std::process::exit(1);
     }
 
+    let predictors = ["W", "N", "NW", "N + W - NW", "N + (W - NW) / 2", "W + (N - NW) / 2", "(N + W) / 2", "new"];
+
     let mut pixels = read_data(&args[1])?;
     let flattened_pixels = flatten(&pixels);
     
@@ -136,28 +138,28 @@ fn main() -> Result<(), Box<dyn Error>> {
         .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(Ordering::Equal))
         .map(|(index, _)| index)
         .unwrap();
-    println!("best total entropy has method nr {}", min_total + 1);
+    println!("best total entropy has predictor {}", predictors[min_total]);
     let min_blue = [code_1_blue_entropy, code_2_blue_entropy, code_3_blue_entropy, code_4_blue_entropy, code_5_blue_entropy, code_6_blue_entropy, code_7_blue_entropy, code_new_blue_entropy]
         .iter()
         .enumerate()
         .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(Ordering::Equal))
         .map(|(index, _)| index)
         .unwrap();
-    println!("best blue entropy has method nr {}", min_blue + 1);
+    println!("best blue entropy has predictor {}", predictors[min_blue]);
     let min_green = [code_1_green_entropy, code_2_green_entropy, code_3_green_entropy, code_4_green_entropy, code_5_green_entropy, code_6_green_entropy, code_7_green_entropy, code_new_green_entropy]
         .iter()
         .enumerate()
         .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(Ordering::Equal))
         .map(|(index, _)| index)
         .unwrap();
-    println!("best total entropy has method nr {}", min_green + 1);
+    println!("best total entropy has predictor {}", predictors[min_green]);
     let min_red = [code_1_red_entropy, code_2_red_entropy, code_3_red_entropy, code_4_red_entropy, code_5_red_entropy, code_6_red_entropy, code_7_red_entropy, code_new_red_entropy]
         .iter()
         .enumerate()
         .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(Ordering::Equal))
         .map(|(index, _)| index)
         .unwrap();
-    println!("best total entropy has method nr {}", min_red + 1);
+    println!("best total entropy has predictor {}", predictors[min_red]);
 
 
     Ok(())
