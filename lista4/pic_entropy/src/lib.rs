@@ -247,15 +247,11 @@ pub fn read_data(file: &str) -> Result<PixelArray, Box<dyn Error>> {
     let bytes = fs::read(file)?;
     let header = &bytes[..18];
     let image = &bytes[18..];
-    //println!("header = {:?}", header);
-    //println!("after-header len = {:?}", image.len());
 
     let width_spec = [bytes[12], bytes[13]];
     let height_spec = [bytes[14], bytes[15]];
     let width = u16::from_le_bytes(width_spec) as usize;
     let height = u16::from_le_bytes(height_spec) as usize;
-    //println!("w = {:?}", width);
-    //println!("h = {:?}", height);
 
     // prepare the pixels array
 
