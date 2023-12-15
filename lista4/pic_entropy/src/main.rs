@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let predictors = ["W", "N", "NW", "N + W - NW", "N + (W - NW) / 2", "W + (N - NW) / 2", "(N + W) / 2", "new"];
 
-    let mut pixels = read_data(&args[1])?;
+    let (_, mut pixels, _) = read_data(&args[1])?;
     let flattened_pixels = flatten(&pixels);
     
     println!("\n--- total ---\n");

@@ -242,7 +242,7 @@ pub fn code_predictor_new(pixels: &PixelArray) -> PixelArray {
     return code;
 }
 
-pub fn read_data(file: &str) -> Result<PixelArray, Box<dyn Error>> {
+pub fn read_data(file: &str) -> Result<(Vec<u8>, PixelArray, Vec<u8>), Box<dyn Error>> {
 
     let bytes = fs::read(file)?;
     let header = &bytes[..18];
@@ -271,5 +271,7 @@ pub fn read_data(file: &str) -> Result<PixelArray, Box<dyn Error>> {
         }
     }
 
-    return Ok(pixels);
+    let footer = &image[(width * height * 3)..];
+
+    return Ok((header.to_vec(), pixels, footer.to_vec()));
 }
