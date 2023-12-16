@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 pic_entropy = {path = "../../lista4/pic_entropy"}
+rand = "0.8.5"
