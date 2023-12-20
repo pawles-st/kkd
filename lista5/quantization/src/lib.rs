@@ -2,9 +2,9 @@ use std::fs;
 use std::cmp::Ordering;
 use rand::distributions::{Distribution, Uniform};
 use pic_entropy::colour::*;
-use crate::colour_dict::ColourDict;
+//use crate::colour_dict::ColourDict;
 
-pub mod colour_dict;
+//pub mod colour_dict;
 
 type PixelVec = Vec<Colour>;
 
@@ -19,6 +19,9 @@ pub struct Centroid {
 type CentroidVec = Vec<Centroid>;
 
 fn lbg_move_centroids(centroids: &mut CentroidVec, clusters: &Vec<PixelVec>) {
+
+    // move each centroid to the middle of the cluster if the cluster isn't empty
+
     for i in 0..centroids.len() {
         if clusters[i].len() > 0 {
             centroids[i].blue = extract_colour(&clusters[i], &Hue::BLUE).iter().map(|&v| v as usize).sum::<usize>() as f64 / clusters[i].len() as f64;
@@ -34,6 +37,9 @@ fn lbg_move_centroids(centroids: &mut CentroidVec, clusters: &Vec<PixelVec>) {
 }
 
 fn lbg_cluster(centroids: &CentroidVec, pixels: &PixelVec) -> Vec<PixelVec> {
+
+    // find the closest centroid for each pixel
+
     let grouped_pixels = pixels
         .iter()
         .map(|p| centroids
@@ -45,6 +51,8 @@ fn lbg_cluster(centroids: &CentroidVec, pixels: &PixelVec) -> Vec<PixelVec> {
             .unwrap()
         ).collect::<Vec<usize>>();
 
+    // create clusters based on the groupings
+
     let mut clusters = Vec::new();
     clusters.resize(centroids.len(), Vec::new());
     for i in 0..grouped_pixels.len() {
@@ -54,21 +62,35 @@ fn lbg_cluster(centroids: &CentroidVec, pixels: &PixelVec) -> Vec<PixelVec> {
 }
 
 pub fn create_lbg_dictionary(pixels: &PixelVec, no_bits: u8, no_repeats: usize, error: f64) -> PixelVec {
+
+    // initialisation
+
     let mut rng = rand::thread_rng();
     let noise = Uniform::new_inclusive(-1, 1);
     let no_colours = 2_i32.pow(no_bits as u32) as usize;
     let no_pixels = pixels.len();
 
+    // compute the average colour of the entire image
+
     let avg_blue = extract_colour(&pixels, &Hue::BLUE).iter().map(|&v| v as usize).sum::<usize>() as f64 / no_pixels as f64;
     let avg_green = extract_colour(&pixels, &Hue::GREEN).iter().map(|&v| v as usize).sum::<usize>() as f64 / no_pixels as f64;
     let avg_red = extract_colour(&pixels, &Hue::RED).iter().map(|&v| v as usize).sum::<usize>() as f64 / no_pixels as f64;
+
+    // create the first centroid as the calculated average
+
     let avg = Centroid{blue: avg_blue, green: avg_green, red: avg_red};
+
+    // lbg initialisation
 
     let mut mse = f64::MAX;
     let mut centroids = vec![avg];
     let mut no_centroids = 1;
     let mut repeat = 0;
+
     while repeat < no_repeats {
+
+        // split each centroid if max number has not been reached
+
         //println!("{:?}", centroids);
         if no_centroids < no_colours {
             for j in 0..no_centroids {
@@ -77,19 +99,36 @@ pub fn create_lbg_dictionary(pixels: &PixelVec, no_bits: u8, no_repeats: usize, 
             }
             no_centroids *= 2;
         }
+
+        // add noise to each centroid
+
         for j in 0..no_centroids {
             centroids[j].blue += noise.sample(&mut rng) as f64;
             centroids[j].green += noise.sample(&mut rng) as f64;
             centroids[j].red += noise.sample(&mut rng) as f64;
         }
+
+        // create lbg clusters and move centroids
+
         let clusters = lbg_cluster(&centroids, &pixels);
         lbg_move_centroids(&mut centroids, &clusters);
+
+        // compute the quantization dictionary from the centroids
+
         let dictionary = centroids
             .iter()
             .map(|c| Colour{blue: c.blue.round() as u8, green: c.green.round() as u8, red: c.red.round() as u8})
             .collect();
+
+        // quantize the pixels with the new dictionary and compute new mse
+
         let quantized_pixels = vector_quantize(&pixels, &dictionary);
         let new_mse = calculate_mse(&colour_to_bytes(&pixels), &colour_to_bytes(&quantized_pixels));
+
+        // check if error threshold has been met;
+        // if so, quit the lbg,
+        // otherwise, continue
+
         if (mse - new_mse).abs() < error {
             println!("quitting lbg due to error change reaching the set threshold");
             break;
@@ -101,6 +140,9 @@ pub fn create_lbg_dictionary(pixels: &PixelVec, no_bits: u8, no_repeats: usize, 
     if repeat == no_repeats {
         println!("quitting lbg due to max repeats reached");
     }
+
+    // construct and return the final quantization dictionary
+
     return centroids
         .iter()
         .map(|c| Colour{blue: c.blue.round() as u8, green: c.green.round() as u8, red: c.red.round() as u8})
@@ -108,6 +150,9 @@ pub fn create_lbg_dictionary(pixels: &PixelVec, no_bits: u8, no_repeats: usize, 
 }
 
 pub fn vector_quantize(pixels: &PixelVec, dictionary: &PixelVec) -> PixelVec {
+
+    // assign each pixel to the closest representative in the quantization dictionary and return the result
+
     return pixels
         .iter()
         .map(|p| dictionary
@@ -119,6 +164,7 @@ pub fn vector_quantize(pixels: &PixelVec, dictionary: &PixelVec) -> PixelVec {
     
 }
 
+/*
 pub fn quantize(pixels: &PixelVec, dictionary: &ColourDict) -> PixelVec {
     return pixels
         .iter()
@@ -142,6 +188,7 @@ pub fn quantize(pixels: &PixelVec, dictionary: &ColourDict) -> PixelVec {
         })
         .collect();
 }
+*/
 
 pub fn calculate_mse(original: &Vec<u8>, quantized: &Vec<u8>) -> f64 {
     let no_bytes = original.len();

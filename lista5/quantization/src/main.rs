@@ -13,21 +13,30 @@ fn flatten<T: std::clone::Clone>(v: &Vec<Vec<T>>) -> Vec<T> {
 }
 
 fn main() -> Result<(), Box<dyn Error>>{
+
+    // read commandline arguments
+
     let args: Vec<String> = env::args().collect();
     if args.len() < 6 {
         eprintln!("usage: path/to/programme <input-file> <output-file> <bits> <max-repeats> <error-threshold>");
         std::process::exit(1);
     }
 
+    // read the tga image
+
     let (header, pixels, footer) = read_data(&args[1])?;
-    let pixels = pixels.iter().rev().cloned().collect();
-    let flattened_pixels = flatten(&pixels);
-    //let quantizer_dictionary = ColourDict::new(args[5].parse().unwrap(), args[4].parse().unwrap(), args[3].parse().unwrap());
+    let pixels = pixels.iter().rev().cloned().collect(); // inverse the image vertically
+    let flattened_pixels = flatten(&pixels); // flatten the array into a single Vec
+
+    // create the quantizer dictionary
+
     let quantizer_dictionary = create_lbg_dictionary(&flattened_pixels, args[3].parse().unwrap(), args[4].parse().unwrap(), args[5].parse().unwrap());
 
-    //println!("{:?}", quantizer_dictionary);
+    // quantize the image using the dictionary
 
     let quantized_pixels = vector_quantize(&flattened_pixels, &quantizer_dictionary);
+
+    // calculate mse
 
     let mse = calculate_mse(&colour_to_bytes(&flattened_pixels), &colour_to_bytes(&quantized_pixels));
     let mse_blue = calculate_mse(&extract_colour(&flattened_pixels, &Hue::BLUE), &extract_colour(&quantized_pixels, &Hue::BLUE));
@@ -38,6 +47,8 @@ fn main() -> Result<(), Box<dyn Error>>{
     println!("mse (green) = {:?}", mse_green);
     println!("mse (red) = {:?}", mse_red);
 
+    // calculate snr
+
     let snr = calculate_snr(&colour_to_bytes(&flattened_pixels), mse);
     let snr_blue = calculate_snr(&extract_colour(&flattened_pixels, &Hue::BLUE), mse);
     let snr_green = calculate_snr(&extract_colour(&flattened_pixels, &Hue::GREEN), mse);
@@ -47,7 +58,7 @@ fn main() -> Result<(), Box<dyn Error>>{
     println!("snr (green) = {:?} ({:?} dB)", snr_green, 10.0 * snr_green.log10());
     println!("snr (red) = {:?} ({:?} dB)", snr_red, 10.0 * snr_red.log10());
 
-    //println!("{:?}", quantized_pixels);
+    // save the file
 
     write_tga(&args[2], &header, &quantized_pixels, &footer);
 
