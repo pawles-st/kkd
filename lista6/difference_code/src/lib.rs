@@ -159,6 +159,13 @@ pub fn create_quantization_dictionary(values: &DiffVec, bits: u8) -> DiffVec {
     }
 
     if no_entries > 1 {
+        let mut add = 1.0;
+        for k in 1..no_entries { 
+            if k > 0 && dictionary[k - 1].blue == 0.0 && dictionary[k].blue == 0.0 {
+                dictionary[k].blue += add;
+                add *= -1.0;
+            }
+        }
         let mut k = 1;
         while k < no_entries && dictionary[k].blue <= 0.0 {
             let mut change = false;
@@ -197,6 +204,13 @@ pub fn create_quantization_dictionary(values: &DiffVec, bits: u8) -> DiffVec {
     }
     
     if no_entries > 1 {
+        let mut add = 1.0;
+        for k in 1..no_entries {
+            if k > 0 && dictionary[k - 1].green == 0.0 && dictionary[k].green == 0.0 {
+                dictionary[k].green += add;
+                add *= -1.0;
+            }
+        }
         let mut k = 1;
         while k < no_entries - 1 && dictionary[k].green <= 0.0 {
             let mut change = false;
@@ -235,6 +249,13 @@ pub fn create_quantization_dictionary(values: &DiffVec, bits: u8) -> DiffVec {
     }
 
     if no_entries > 1 {
+        let mut add = 1.0;
+        for k in 1..no_entries { 
+            if k > 0 && dictionary[k - 1].red == 0.0 && dictionary[k].red == 0.0 {
+                dictionary[k].red += add;
+                add *= -1.0;
+            }
+        }
         let mut k = 1;
         while k < no_entries - 1 && dictionary[k].red < 0.0 {
             let mut change = false;
