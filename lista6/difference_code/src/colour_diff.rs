@@ -1,9 +1,11 @@
 use pic_entropy::colour::Colour;
 use std::ops::{Add, Sub, Div};
+use serde::{Serialize, Deserialize};
 
 #[derive(Copy)]
 #[derive(Clone)]
 #[derive(Debug)]
+#[derive(Serialize, Deserialize)]
 pub struct ColourDiff {
     pub blue: f64,
     pub green: f64,

@@ -90,7 +90,7 @@ pub fn filter_high(pixels: &PixelVec) -> DiffVec {
 }
 
 pub fn code_difference(filtered_pixels: &DiffVec) -> DiffVec {
-    let mut differences = vec![filtered_pixels[0].clone()];
+    let mut differences = vec![filtered_pixels[0]];
 
     for i in 1..filtered_pixels.len() {
         let curr_pixel = filtered_pixels[i];
@@ -102,7 +102,7 @@ pub fn code_difference(filtered_pixels: &DiffVec) -> DiffVec {
 }
 
 pub fn reconstruct_from_diff(diff_pixels: &DiffVec) -> DiffVec {
-    let mut original = vec![diff_pixels[0].clone()];
+    let mut original = vec![diff_pixels[0]];
 
     for i in 1..diff_pixels.len() {
         let curr_diff = diff_pixels[i];
@@ -154,9 +154,37 @@ pub fn create_quantization_dictionary(values: &DiffVec, bits: u8) -> DiffVec {
     // find the blue colour dictionary
 
     sorted.sort_unstable_by(|a, b| a.blue.partial_cmp(&b.blue).unwrap());
-    println!("sorted blue: {:?}", sorted);
     for k in 0..no_entries {
         dictionary[k].blue = sorted[f64::floor((k as f64 + 0.5) / no_entries as f64 * no_values as f64) as usize].blue;
+    }
+
+    let mut k = 1;
+    while k < no_entries && dictionary[k].blue <= 0.0 {
+        let mut change = false;
+        while k > 0 && dictionary[k - 1].blue == dictionary[k].blue {
+            change = true;
+            dictionary.swap(k - 1, k);
+            k -= 1;
+        }
+        if change {
+            dictionary[k].blue -= 1.0;
+        } else {
+            k += 1;
+        }
+    }
+    let mut k = dictionary.len() - 2;
+    while k > 0 && dictionary[k].blue > 0.0 {
+        let mut change = false;
+        while k + 1 < no_entries && dictionary[k].blue == dictionary[k + 1].blue {
+            change = true;
+            dictionary.swap(k, k + 1);
+            k += 1;
+        }
+        if change {
+            dictionary[k].blue += 1.0;
+        } else {
+            k -= 1;
+        }
     }
     
     // find the green colour dictionary
@@ -166,11 +194,69 @@ pub fn create_quantization_dictionary(values: &DiffVec, bits: u8) -> DiffVec {
         dictionary[k].green = sorted[f64::floor((k as f64 + 0.5) / no_entries as f64 * no_values as f64) as usize].green;
     }
     
+    let mut k = 1;
+    while k < no_entries - 1 && dictionary[k].green <= 0.0 {
+        let mut change = false;
+        while k > 0 && dictionary[k - 1].green == dictionary[k].green {
+            change = true;
+            dictionary.swap(k - 1, k);
+            k -= 1;
+        }
+        if change {
+            dictionary[k].green -= 1.0;
+        } else {
+            k += 1;
+        }
+    }
+    let mut k = dictionary.len() - 2;
+    while k > 0 && dictionary[k].green > 0.0 {
+        let mut change = false;
+        while k + 1 < no_entries && dictionary[k].green == dictionary[k + 1].green {
+            change = true;
+            dictionary.swap(k, k + 1);
+            k += 1;
+        }
+        if change {
+            dictionary[k].green += 1.0;
+        } else {
+            k -= 1;
+        }
+    }
+    
     // find the red colour dictionary
 
     sorted.sort_unstable_by(|a, b| a.red.partial_cmp(&b.red).unwrap());
     for k in 0..no_entries {
         dictionary[k].red = sorted[f64::floor((k as f64 + 0.5) / no_entries as f64 * no_values as f64) as usize].red;
+    }
+
+    let mut k = 1;
+    while k < no_entries - 1 && dictionary[k].red < 0.0 {
+        let mut change = false;
+        while k > 0 && dictionary[k - 1].red == dictionary[k].red {
+            change = true;
+            dictionary.swap(k - 1, k);
+            k -= 1;
+        }
+        if change {
+            dictionary[k].red -= 1.0;
+        } else {
+            k += 1;
+        }
+    }
+    let mut k = dictionary.len() - 2;
+    while k > 0 && dictionary[k].red >= 0.0 {
+        let mut change = false;
+        while k + 1 < no_entries && dictionary[k].red == dictionary[k + 1].red {
+            change = true;
+            dictionary.swap(k, k + 1);
+            k += 1;
+        }
+        if change {
+            dictionary[k].red += 1.0;
+        } else {
+            k -= 1;
+        }
     }
 
     return dictionary;
