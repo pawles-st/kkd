@@ -1,10 +1,26 @@
 use bitvec::prelude::*;
 use rand::prelude::*;
+use std::iter::zip;
 
 #[derive(Debug)]
 pub enum CodingError {
     InvalidNumberOfBits,
     TooManyErrors,
+}
+
+pub fn count_deformed_bits(original: &BitVec, deformed: &BitVec) -> Result<usize, CodingError> {
+    if original.len() != deformed.len() {
+        return Err(CodingError::InvalidNumberOfBits);
+    }
+
+    return Ok(zip(original, deformed)
+        .fold(0, |acc, (og_bit, df_bit)| {
+            if og_bit == df_bit {
+                acc
+            } else {
+                acc + 1
+            }
+        }));
 }
 
 pub fn encode(bits: &BitVec) -> Result<BitVec, CodingError> {
@@ -50,7 +66,7 @@ pub fn decode(code: &BitVec, syndrome: &BitVec) -> Result<BitVec, CodingError> {
 
     if *syndrome == bitvec![0, 0, 0, 0] { // no errors
         corrected = code.clone();
-    } else if syndrome[3] == true { // 1 error
+    } else {
         let bit_flipped = if syndrome[0..3].to_bitvec() == bitvec![0, 0, 1] {
             0
         } else if syndrome[0..3].to_bitvec() == bitvec![0, 1, 0] {
@@ -77,8 +93,6 @@ pub fn decode(code: &BitVec, syndrome: &BitVec) -> Result<BitVec, CodingError> {
                 corrected.push(code[i]);
             }
         }
-    } else {
-        return Err(CodingError::TooManyErrors);
     }
 
     //println!("{:?}", corrected);

@@ -6,25 +6,57 @@ use correction::*;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        eprintln!("please specify a file");
+    if args.len() < 3 {
+        eprintln!("please specify a file and probability");
         std::process::exit(1);
     }
+
+    // read file and probability
+
     let bytes = fs::read(&args[1]).unwrap();
     let bits = BitVec::<_, Lsb0>::from_vec(bytes);
-    //let message = bitvec![1, 0, 1, 1];
+    let p = (&args[2]).parse().expect("should be a float number");
 
+    let no_blocks = bits.len() / 4;
     let mut mismatched_blocks = 0;
-    let mut two_errors = 0;
+    let mut blocks_with_deformations = 0;
+    let mut blocks_with_two_deformations = 0;
+
+    // split data into chunks
+
     for block in bits.chunks(4) {
         let mut data = BitVec::new();
         for i in 0..4 {
             data.push(block[i]);
         }
 
+        // code the chunk
+
         let code = encode(&data).unwrap();
-        let distorted = noise(&code, 0.1);
+
+        // apply noise
+
+        let distorted = noise(&code, p);
+
+        // count the number of deformed bits
+
+        let deformed_bits = count_deformed_bits(&code, &distorted).unwrap();
+
+        // gather statistics
+
+        if deformed_bits > 0 {
+            blocks_with_deformations += 1;
+            if deformed_bits == 2 {
+                blocks_with_two_deformations += 1;
+            }
+        }
+
+        // compute syndrome
+
         let syndrome = check(&distorted).unwrap();
+
+        // apply correction
+
         match decode(&distorted, &syndrome) {
             Ok(original) => {
                 if data != original {
@@ -33,20 +65,11 @@ fn main() {
             }
             Err(_) => {
                 mismatched_blocks += 1;
-                two_errors += 1;
             }
         }
     }
-    println!("mismatched blocks: {}", mismatched_blocks);
-    println!("number of blocks with two errors: {}", two_errors);
-    /*
-    let code = encode(&message).unwrap();
-    println!("{:?}", code);
-    let distorted = noise(&code, 0.1);
-    println!("{:?}", distorted);
-    let syndrome = check(&distorted).unwrap();
-    println!("{:?}", syndrome);
-    let original = decode(&distorted, &syndrome).unwrap();
-    println!("{:?}", original);
-    */
+
+    // print statistics
+
+    println!("{} {} {} {}", blocks_with_deformations, blocks_with_two_deformations, mismatched_blocks, no_blocks);
 }
