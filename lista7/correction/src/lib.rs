@@ -57,16 +57,20 @@ pub fn check(code: &BitVec) -> Result<BitVec, CodingError> {
     return Ok(syndrome);
 }
 
-pub fn decode(code: &BitVec, syndrome: &BitVec) -> Result<BitVec, CodingError> {
+pub fn decode(code: &BitVec, syndrome: &BitVec) -> Result<(BitVec, bool), CodingError> {
     if code.len() != 8 || syndrome.len() != 4 {
         return Err(CodingError::InvalidNumberOfBits);
     }
 
     let mut corrected;
+    let mut two_errors = false;
 
     if *syndrome == bitvec![0, 0, 0, 0] { // no errors
         corrected = code.clone();
     } else {
+        if syndrome[3] == false {
+            two_errors = true;
+        }
         let bit_flipped = if syndrome[0..3].to_bitvec() == bitvec![0, 0, 1] {
             0
         } else if syndrome[0..3].to_bitvec() == bitvec![0, 1, 0] {
@@ -102,7 +106,7 @@ pub fn decode(code: &BitVec, syndrome: &BitVec) -> Result<BitVec, CodingError> {
     data.push(corrected[0] ^ corrected[1]);
     data.push(corrected[5]);
     data.push(corrected[6]);
-    return Ok(data);
+    return Ok((data, two_errors));
 }
 
 pub fn noise(bits: &BitVec, p: f32) -> BitVec {

@@ -46,9 +46,6 @@ fn main() {
 
         if deformed_bits > 0 {
             blocks_with_deformations += 1;
-            if deformed_bits == 2 {
-                blocks_with_two_deformations += 1;
-            }
         }
 
         // compute syndrome
@@ -58,9 +55,12 @@ fn main() {
         // apply correction
 
         match decode(&distorted, &syndrome) {
-            Ok(original) => {
+            Ok((original, two_errors)) => {
                 if data != original {
                     mismatched_blocks += 1;
+                }
+                if two_errors {
+                    blocks_with_two_deformations += 1;
                 }
             }
             Err(_) => {
